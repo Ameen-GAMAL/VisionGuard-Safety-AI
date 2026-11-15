@@ -6,6 +6,8 @@ dependency in the hot path). Colors are BGR.
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 import cv2
 import numpy as np
 
@@ -13,6 +15,9 @@ from visionguard.detection.types import Detection, ObjectClass
 from visionguard.safety.events import SafetyEvent, Severity
 from visionguard.safety.zones import Zone
 from visionguard.tracking.tracker import TrackedObject
+
+if TYPE_CHECKING:
+    from visionguard.safety.proximity import ProximityPair
 
 CLASS_COLORS: dict[ObjectClass, tuple[int, int, int]] = {
     ObjectClass.WORKER: (80, 200, 120),      # green

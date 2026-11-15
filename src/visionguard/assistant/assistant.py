@@ -5,7 +5,7 @@ Architecture (classic RAG with a structured-facts twist):
     question ──▶ 1. structured facts (SQL aggregates: counts, compliance, zones)
              ──▶ 2. semantic retrieval (FAISS over event descriptions)
              ──▶ 3. answer synthesis:
-                    - Claude (Anthropic API) when credentials are available
+                    - Claude (Anthropic API) only when explicitly enabled
                     - deterministic template otherwise (retrieval-only mode)
 
 The structured facts matter: questions like "how many helmet violations?"
@@ -18,7 +18,7 @@ from __future__ import annotations
 import logging
 import os
 from dataclasses import dataclass, field
-from typing import Any
+from threading import RLock
 
 from visionguard.safety.events import SafetyEvent
 from visionguard.storage.event_store import EventStore, RunRecord
@@ -48,11 +48,9 @@ class AssistantAnswer:
 
 
 def _facts_block(run: RunRecord, counts: dict[str, int]) -> str:
-    """Render the structured facts handed to the LLM (and to the fallback)."""
+    """Render aggregate facts without source paths or absolute run times."""
     stats = run.stats
     lines = [
-        f"video: {run.video_source}",
-        f"analyzed_at_utc: {run.started_at[:19]}",
         f"video_duration_seconds: {run.duration_seconds or 0:.0f}",
         f"ppe_compliance_rate: {(run.compliance_rate or 0) * 100:.1f}%",
         f"total_events: {sum(counts.values())}",
@@ -90,6 +88,12 @@ class SafetyAssistant:
         self._settings = settings
         self._indexer = None          # built lazily (downloads a model once)
         self._indexed_run: int | None = None
+        self._retrieval_lock = RLock()
+
+    @property
+    def cloud_available(self) -> bool:
+        """Cloud requests still require an explicit opt-in from the caller."""
+        return self._settings.cloud_enabled is True and bool(os.environ.get("ANTHROPIC_API_KEY"))
 
     # ------------------------------------------------------------------ #
     # Retrieval
@@ -97,14 +101,18 @@ class SafetyAssistant:
     def _retrieve(self, question: str, run_id: int) -> list[tuple[SafetyEvent, float]]:
         """Semantic search over the run's events; empty on indexing failure."""
         try:
-            if self._indexer is None:
-                from visionguard.assistant.indexer import EventIndexer
+            # The dashboard can share this assistant across sessions. Keep
+            # run selection and search together so results cannot cross runs.
+            with self._retrieval_lock:
+                if self._indexer is None:
+                    from visionguard.assistant.indexer import EventIndexer
 
-                self._indexer = EventIndexer(self._settings.embedding_model)
-            if self._indexed_run != run_id:
-                self._indexer.build(self._store.events_for_run(run_id))
-                self._indexed_run = run_id
-            return self._indexer.search(question, self._settings.top_k)
+                    self._indexer = EventIndexer(self._settings.embedding_model)
+                if self._indexed_run != run_id:
+                    self._indexed_run = None
+                    self._indexer.build(self._store.events_for_run(run_id))
+                    self._indexed_run = run_id
+                return self._indexer.search(question, self._settings.top_k)
         except Exception:  # retrieval is an enhancement, never a hard failure
             logger.exception("Event retrieval failed; answering from facts only")
             return []
@@ -112,7 +120,7 @@ class SafetyAssistant:
     # ------------------------------------------------------------------ #
     # Answering
     # ------------------------------------------------------------------ #
-    def answer(self, question: str, run_id: int) -> AssistantAnswer:
+    def answer(self, question: str, run_id: int, *, allow_cloud: bool = False) -> AssistantAnswer:
         """Answer a question about one analysis run."""
         run = self._store.get_run(run_id)
         if run is None:
@@ -123,11 +131,11 @@ class SafetyAssistant:
         matches = self._retrieve(question, run_id)
         sources = [event for event, _ in matches]
 
-        if os.environ.get("ANTHROPIC_API_KEY"):
+        if allow_cloud is True and self.cloud_available:
             try:
                 return self._answer_with_claude(question, facts, matches, sources)
-            except Exception:
-                logger.exception("Claude call failed; falling back to composed answer")
+            except Exception as error:
+                logger.warning("Cloud synthesis failed (%s); falling back locally", type(error).__name__)
 
         return self._composed_answer(question, run, counts, facts, matches)
 
@@ -197,7 +205,7 @@ class SafetyAssistant:
         else:
             lines.append("No recorded incidents match your question.")
         lines.append(
-            "(Set ANTHROPIC_API_KEY to enable full natural-language answers.)"
+            "(Answered locally. Cloud synthesis is optional and requires explicit opt-in.)"
         )
         return AssistantAnswer(
             text="\n".join(lines),

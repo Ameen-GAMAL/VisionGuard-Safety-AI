@@ -1,10 +1,11 @@
 """Tests for the safety assistant (facts + fallback path; no network/LLM)."""
 
+from dataclasses import replace
 from pathlib import Path
 
 import pytest
 
-from visionguard.assistant.assistant import SafetyAssistant, _facts_block
+from visionguard.assistant.assistant import AssistantAnswer, SafetyAssistant, _facts_block
 from visionguard.safety.events import EventType, SafetyEvent
 from visionguard.storage.event_store import EventStore
 from visionguard.utils.config import AssistantSettings
@@ -69,6 +70,8 @@ def test_facts_block_contains_exact_counts(store_with_run) -> None:
     assert "events.zone_intrusion: 1" in facts
     assert "ppe_compliance_rate: 90.0%" in facts
     assert "most_dangerous_zone: Crane area" in facts
+    assert "site.mp4" not in facts
+    assert "analyzed_at_utc" not in facts
 
 
 def test_fallback_answer_without_api_key(store_with_run) -> None:
@@ -107,3 +110,25 @@ def test_retrieval_failure_never_crashes(store_with_run, monkeypatch) -> None:
     assert answer.text                      # still answered from facts
     assert answer.sources == []             # retrieval contributed nothing
     assert not answer.used_llm
+
+
+@pytest.mark.parametrize(
+    ("configured", "consent", "has_key", "sent"),
+    [(False, True, True, False), (True, False, True, False), (True, True, False, False), (True, True, True, True)],
+)
+def test_cloud_requires_config_key_and_caller_consent(store_with_run, monkeypatch, configured, consent, has_key, sent):
+    store, run_id = store_with_run
+    if has_key:
+        monkeypatch.setenv("ANTHROPIC_API_KEY", "unused-test-key")
+    assistant = _NoRetrievalAssistant(store, replace(SETTINGS, cloud_enabled=configured))
+    requests = []
+
+    def fake_provider(question, facts, matches, sources):
+        requests.append(question)
+        assert "site.mp4" not in facts
+        return AssistantAnswer(text="provider result", used_llm=True)
+
+    monkeypatch.setattr(assistant, "_answer_with_claude", fake_provider)
+    answer = assistant.answer("Describe this run", run_id, allow_cloud=consent)
+    assert answer.used_llm is sent
+    assert bool(requests) is sent

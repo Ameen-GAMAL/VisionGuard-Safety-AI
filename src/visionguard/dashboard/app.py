@@ -69,6 +69,7 @@ store = EventStore(config.events.database_path)
 
 st.sidebar.title("🦺 VisionGuard")
 st.sidebar.caption("AI Safety Command Center")
+st.sidebar.warning("Research prototype. Use human review for every safety decision.")
 
 videos = list_videos(config)
 if videos:
@@ -233,14 +234,15 @@ with heatmap_tab:
 with report_tab:
     st.write(
         "Generate a PDF incident report with the executive summary and "
-        "screenshot evidence for every incident."
+        "screenshot evidence where available."
     )
+    pdf_key = f"pdf_path_{run.id}"
     if st.button("Generate PDF report", type="primary"):
         builder = IncidentReportBuilder(store, config.output.reports_dir)
         pdf_path = builder.build(run.id)
-        st.session_state["pdf_path"] = str(pdf_path)
+        st.session_state[pdf_key] = str(pdf_path)
         st.success(f"Report written to {pdf_path}")
-    pdf_path = st.session_state.get("pdf_path")
+    pdf_path = st.session_state.get(pdf_key)
     if pdf_path and Path(pdf_path).exists():
         st.download_button(
             "⬇ Download report",
@@ -260,6 +262,18 @@ with assistant_tab:
     def get_assistant() -> SafetyAssistant:
         return SafetyAssistant(store, get_config().assistant)
 
+    assistant = get_assistant()
+    cloud_opt_in = False
+    if assistant.cloud_available:
+        cloud_opt_in = st.checkbox(
+            "Allow Anthropic to synthesize answers for this run",
+            value=False,
+            key=f"assistant_cloud_{run.id}",
+            help="Sends your question, aggregate findings, and matching incident descriptions and timestamps.",
+        )
+    else:
+        st.caption("The assistant uses local retrieval and facts.")
+
     history_key = f"assistant_history_{run.id}"
     history = st.session_state.setdefault(history_key, [])
 
@@ -274,7 +288,7 @@ with assistant_tab:
             st.markdown(question)
         with st.chat_message("assistant"):
             with st.spinner("Consulting the incident history…"):
-                result = get_assistant().answer(question, run.id)
+                result = assistant.answer(question, run.id, allow_cloud=cloud_opt_in)
             st.markdown(result.text)
             if result.sources:
                 with st.expander(f"Evidence ({len(result.sources)} incidents)"):

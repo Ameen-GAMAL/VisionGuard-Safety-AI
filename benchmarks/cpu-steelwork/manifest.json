@@ -1,0 +1,145 @@
+{
+  "schema_version": 1,
+  "scope": "one detector frame at a time; excludes decoding, tracking, and all downstream safety stages",
+  "started_utc": "2026-11-15T06:21:30.190694+00:00",
+  "commit": "eee6cdd7cf784d3c45c0a1b7b4d2fb9f0c34d01c",
+  "worktree_dirty": true,
+  "inputs": {
+    "video": {
+      "file_name": "construction_steelwork.mp4",
+      "size_bytes": 3599519,
+      "sha256": "fcce622402a62bd3412114ffd0aca25e6d205552d079f041b0bb5821dce41dce"
+    },
+    "weights": {
+      "file_name": "ppe_yolo11s.pt",
+      "size_bytes": 19153626,
+      "sha256": "5784502619f8d54d71530e0b36b6af3741a7bbfc2614d613c03eea33b0fa2b95"
+    },
+    "config": {
+      "file_name": "config.yaml",
+      "size_bytes": 4655,
+      "sha256": "f6d729cfb5796a4f13287c63a21f81b8a07ba75c16627876ff751136396f384a"
+    },
+    "benchmark_script": {
+      "file_name": "benchmark.py",
+      "size_bytes": 11753,
+      "sha256": "c94ec02fcc64ede200e601afd6f8fb7a535ea0d06dac620aa1b23573d3451913"
+    }
+  },
+  "parameters": {
+    "frames_requested": 24,
+    "frame_indices": [
+      0,
+      21,
+      42,
+      63,
+      84,
+      105,
+      126,
+      147,
+      168,
+      189,
+      210,
+      231,
+      253,
+      274,
+      295,
+      316,
+      337,
+      358,
+      379,
+      400,
+      421,
+      442,
+      463,
+      485
+    ],
+    "resize_width": 1280,
+    "input_size": 640,
+    "warmup_per_repetition": 5,
+    "repetitions": 3,
+    "cpu_only": true,
+    "pytorch_only": false
+  },
+  "runtime": {
+    "python": "3.12.0",
+    "os": "Windows-11-10.0.26200-SP0",
+    "cpu": "Intel64 Family 6 Model 141 Stepping 1, GenuineIntel",
+    "torch_threads": 8,
+    "opencv_threads": 1,
+    "gpu": null,
+    "cuda": "12.1",
+    "packages": {
+      "torch": "2.5.1+cu121",
+      "torchvision": "0.20.1+cu121",
+      "ultralytics": "8.4.89",
+      "opencv-python": "5.0.0.93",
+      "numpy": "2.4.4",
+      "onnx": "1.22.0",
+      "onnxruntime": "1.27.0"
+    }
+  },
+  "skipped": [],
+  "results": [
+    {
+      "configuration": "PyTorch FP32 (CPU)",
+      "provider": "cpu",
+      "timed_scope": "Ultralytics preprocessing, inference and postprocessing",
+      "model": {
+        "file_name": "ppe_yolo11s.pt",
+        "size_bytes": 19153626,
+        "sha256": "5784502619f8d54d71530e0b36b6af3741a7bbfc2614d613c03eea33b0fa2b95"
+      },
+      "n_samples": 72,
+      "mean_ms": 74.00411249999999,
+      "p50_ms": 73.40305000000001,
+      "p95_ms": 80.06064500000001,
+      "p99_ms": 83.41009000000001,
+      "frames_per_second": 13.512762550864997
+    },
+    {
+      "configuration": "ONNX Runtime FP32 (CPU)",
+      "provider": "CPUExecutionProvider",
+      "timed_scope": "Direct-resize preprocessing and ONNX forward pass; no NMS",
+      "model": {
+        "file_name": "ppe_yolo11s.onnx",
+        "size_bytes": 37943929,
+        "sha256": "c18eda7bb3eb33c57bf1d6ae93e1cdb5b0a5ac31e82ffb28270f95a9c136cc77"
+      },
+      "n_samples": 72,
+      "mean_ms": 77.44636111111112,
+      "p50_ms": 77.57655,
+      "p95_ms": 80.015525,
+      "p99_ms": 81.27687300000001,
+      "frames_per_second": 12.912162503869164
+    },
+    {
+      "configuration": "ONNX Runtime INT8 (CPU)",
+      "provider": "CPUExecutionProvider",
+      "timed_scope": "Direct-resize preprocessing and ONNX forward pass; no NMS",
+      "model": {
+        "file_name": "ppe_yolo11s_int8.onnx",
+        "size_bytes": 9871083,
+        "sha256": "c3c1ff69bfc418d5febb5536380349c53314dd6cea49ed57bf79a1c0122b3bf1"
+      },
+      "n_samples": 72,
+      "mean_ms": 118.39050972222223,
+      "p50_ms": 118.35485,
+      "p95_ms": 124.51082,
+      "p99_ms": 126.31889300000002,
+      "frames_per_second": 8.446622979715892
+    }
+  ],
+  "outputs": [
+    {
+      "file_name": "latency.csv",
+      "size_bytes": 8101,
+      "sha256": "8c21bcdd65408cb133fde351ba72f5b79d064c7ae022e703f8ee3bfd334966d8"
+    },
+    {
+      "file_name": "latency.png",
+      "size_bytes": 30568,
+      "sha256": "c38bc0bb0f1c69b042348534a5239814863b5ffea44357f0a3ff3661f1621286"
+    }
+  ]
+}

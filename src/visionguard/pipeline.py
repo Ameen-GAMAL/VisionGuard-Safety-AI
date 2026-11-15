@@ -93,7 +93,8 @@ class SafetyPipeline:
 
         run_id = self._store.create_run(source_name)
         screenshots_dir = config.events.screenshots_dir / f"run_{run_id}"
-        screenshots_dir.mkdir(parents=True, exist_ok=True)
+        if config.events.save_screenshots:
+            screenshots_dir.mkdir(parents=True, exist_ok=True)
         annotated_path = config.output.annotated_dir / f"run_{run_id}.mp4"
 
         logger.info("Run %d started on %s", run_id, source_name)
@@ -185,9 +186,10 @@ class SafetyPipeline:
                     # ---- Event persistence (screenshot AFTER annotation,
                     #      so evidence images show boxes and IDs) ---------- #
                     for event in new_events:
-                        event.screenshot_path = portable_path(
-                            self._save_screenshot(frame, event, screenshots_dir)
-                        )
+                        if config.events.save_screenshots:
+                            event.screenshot_path = portable_path(
+                                self._save_screenshot(frame, event, screenshots_dir)
+                            )
                         self._store.add_event(run_id, event)
                         banner_alerts.append(event)
                         events_total += 1

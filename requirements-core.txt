@@ -1,0 +1,6 @@
+# Model-free safety logic, tracking, event storage, and reporting.
+numpy==2.4.4
+opencv-python==5.0.0.93
+supervision==0.29.1
+PyYAML==6.0.3
+reportlab==5.0.0

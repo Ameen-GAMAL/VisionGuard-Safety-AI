@@ -1,0 +1,8 @@
+# Field evaluation protocol
+
+The generated-video smoke tests exercise wiring, tracking, persistence and reporting with controlled inputs. The [detector benchmark](../benchmarks/cpu-steelwork/manifest.json) measures backend timing. Use the following protocol for any claim about field accuracy or end-to-end throughput.
+
+1. Define each scenario and an event-matching window before the run. Use consented or rights-cleared footage with annotated positive and negative events. Record camera position, frame rate, lighting, types of occlusions and proximity calibration error. Keep threshold-tuning clips separate from held-out clips. For Re-ID, label identities with anonymous study IDs and separate cameras and people as the evaluation design requires.
+2. Record the configuration, exact model and media digests, source revision, decoded frame count, skipped-frame settings, CPU/GPU environment and installed packages. Repeat each performance run with the same inputs and note how encode, tracking, analysis and UI latency were measured. Keep device-specific results separate.
+3. Mark start/stop times and severity for independently reviewed events. Record missed incidents, false alerts, detection delay, near-miss distance error and camera-specific limitations. Report counts and denominators for every scenario and label ambiguous cases for review. Avoid publishing footage, individual identities or site details without explicit clearance.
+4. Export a de-identified run manifest with labelled scenario IDs and aggregate outcomes. Verify reproduction on a second machine or run before using evidence as a portfolio claim. The recurring deployment, counters and reports still require human review.

@@ -1,20 +1,20 @@
 # VisionGuard Safety AI 🦺
 
-**Real-Time Computer Vision Platform for Workplace Safety, PPE Compliance, and Hazard Intelligence**
+**Workplace video analytics prototype for human-reviewed safety investigations.**
 
 > ### 💬 *"Is this workplace safe right now?"*
 
-VisionGuard answers that question **continuously, from ordinary CCTV footage**. Point it at a construction site, factory, or warehouse camera and it becomes a tireless safety officer: it spots the worker without a helmet, measures — in real meters — how close the forklift came to a person, notices someone go down and stay down, and turns every incident into timestamped, screenshot-backed evidence. Everything condenses into one live **0–100 Safety Risk Score**, a **command-center dashboard**, auto-generated **PDF incident reports**, and an **AI assistant** you can question in plain language.
+VisionGuard analyzes video for PPE evidence, restricted-zone entries, fall cues and calibrated worker-to-vehicle distances. It combines detector output and configured rules into a **0–100 risk score**, dashboard and timestamped report. The score helps prioritize a human review. It is a prototype with no safety certification or field-validated accuracy guarantee. See the [privacy and operating limits](PRIVACY.md).
 
-Built end-to-end in three phases — perception → spatial & temporal reasoning → risk analytics and product surfaces — with **13 features, 76 automated tests, measured performance benchmarks, and live-footage verification** at every step.
+The repository includes model-free pipeline tests, detector performance tools and [recorded limitations](#-engineering-field-notes).
 
-> ### 🚀 [**Try the live demo →**](https://huggingface.co/spaces/khatem/VisionGuard-Safety-AI)
-> The Safety Command Center running on Hugging Face Spaces, with two pre-analyzed videos (a construction site and a person-down emergency) ready to explore — alerts, risk timeline, heatmap, PDF reports, and the AI assistant.
+> [External demonstration Space](https://huggingface.co/spaces/khatem/VisionGuard-Safety-AI), published under the `khatem` account. Availability, deployed commit, current operator and data-handling settings could not be verified on 2026-11-15. Use the local setup for footage and questions requiring controlled handling.
 
-![Annotated frame](docs/images/annotated_frame.jpg)
+![Generated VisionGuard replay showing a tracked figure and a helmet alert](docs/images/synthetic_pipeline.gif)
 
-| 13 features | 76 tests | 25–29 FPS end-to-end | 5 deployment configs benchmarked | 4-video live verification |
-|:---:|:---:|:---:|:---:|:---:|
+The replay uses drawn shapes and scripted detections. Live tracking, the PPE rule and annotated output run through the same application pipeline. It illustrates the alert flow without footage of real people or a claim about detector accuracy.
+
+[CI runs](https://github.com/Ameen-GAMAL/VisionGuard-Safety-AI/actions/workflows/ci.yml) · [Security](SECURITY.md) · [Third-party sources](THIRD_PARTY_NOTICES.md)
 
 ---
 
@@ -142,20 +142,32 @@ A walkthrough of the Safety Command Center, captured live from the running app (
 
 ![Danger heatmap](docs/images/danger_heatmap.png)
 
-**Headline numbers** (RTX 4050 Laptop 6 GB, 1280×720 processing):
+**Historical observations** (reported on RTX 4050 Laptop 6 GB, 1280×720 processing). These development observations lack retained machine-readable results or independent accuracy labels.
 
 | Metric | Value |
 |--------|-------|
 | End-to-end pipeline speed | **25–29 FPS** (detection + pose + tracking + all rule engines + annotation + encode) |
 | Compliant-crew false alarms | **0** on the steelwork video (100% compliance, correctly) |
-| Test suite | **76 tests, ~12 s, no GPU required** |
-| Live verification | 4 videos exercising every alarm feature ([details below](#-testing--verification)) |
+| Automated checks | CPU tests and a generated-video integration test ([details below](#-testing--verification)) |
+| Live observations | Four development videos and their reported outcomes ([details below](#-testing--verification)) |
 
 ---
 
 ## ⚡ Edge Deployment Benchmarks
 
-`scripts/benchmark.py` exports the detector to ONNX, applies INT8 dynamic quantization, and measures **single-image inference at 640×640 including pre/post-processing** (80 real video frames per configuration, warmed up):
+`scripts/benchmark.py` measures **single-image detector latency at 640×640**. PyTorch timings include the Ultralytics prediction pipeline. Direct ONNX Runtime timings include preprocessing and the forward pass. The manifest identifies the timed stages per variant and separates these timings from end-to-end safety pipeline speed.
+
+Measured local CPU sample on Windows 11 with an Intel i7-11800H. Each variant used 24 sampled steelwork frames across three repetitions. The files record the base commit, changed working tree and tested script hash. These timings do not estimate event accuracy.
+
+| Configuration | Size | p50 | p95 |
+| --- | ---: | ---: | ---: |
+| PyTorch FP32 CPU | 19.15 MB | 73.4 ms | 80.1 ms |
+| ONNX Runtime FP32 CPU | 37.94 MB | 77.6 ms | 80.0 ms |
+| ONNX Runtime INT8 CPU | 9.87 MB | 118.4 ms | 124.5 ms |
+
+[Measured manifest](benchmarks/cpu-steelwork/manifest.json) · [Raw latency samples](benchmarks/cpu-steelwork/latency.csv) · [Latency chart](benchmarks/cpu-steelwork/latency.png)
+
+Historical detector measurements from project development are retained below for context. Raw samples for this table were unavailable for verification.
 
 | Configuration | Size (MB) | Mean latency | p95 | Throughput |
 |---|---|---|---|---|
@@ -165,7 +177,7 @@ A walkthrough of the Safety Command Center, captured live from the running app (
 | ONNX Runtime FP32 (CPU) | 37.9 | 67.5 ms | 71.1 ms | **14.8 FPS** |
 | ONNX Runtime INT8 (CPU) | **9.9** | 115.4 ms | 125.2 ms | **8.7 FPS** |
 
-💡 **Notable finding:** INT8 quantization cut the model to a **quarter of the ONNX FP32 size** (small enough for microcontroller-class storage) but ran *slower* on desktop x86, where dynamically-quantized convolutions lack fast kernels — INT8's latency win materializes on ARM edge devices (Jetson, Raspberry Pi). Size-vs-speed platform dependence is exactly the trade-off an edge deployment plan must weigh.
+The historical INT8 export was about one-quarter of the FP32 file size and slower on that desktop test. Edge-device speed and detection accuracy need separate measurements on the target hardware.
 
 ---
 
@@ -261,23 +273,24 @@ VisionGuard-Safety-AI/
 
 ## 📦 Installation
 
-Requires **Python 3.11+**. A CUDA GPU is strongly recommended (CPU works, slower).
+Use Python 3.11 or 3.12 on Windows or Linux x86-64.
 
 ```bash
-git clone https://github.com/mohamed1232005/VisionGuard-Safety-AI.git
+git clone https://github.com/Ameen-GAMAL/VisionGuard-Safety-AI.git
 cd VisionGuard-Safety-AI
 
 python -m venv .venv
 .venv\Scripts\activate            # Windows   (Linux/macOS: source .venv/bin/activate)
 
-pip install -r requirements.txt --extra-index-url https://download.pytorch.org/whl/cu121
-pip install -e .
+python -m pip install -r requirements-cpu.txt
+python -m pip install --no-deps -e .
 
-python scripts/download_assets.py # model weights + sample & test videos
-pytest                            # all 76 tests should pass
+python scripts/download_assets.py # model weights and the default clip
 ```
 
-> **GPU note:** `requirements.txt` pins the CUDA 12.1 PyTorch build (needs the extra index URL above; NVIDIA driver 531+). On this project's dev machine — RTX 4050, driver 537.70 — the newer cu126 wheels failed with `CUDA error: device busy or unavailable`; cu121 resolved it. CPU-only installs can drop the extra index URL and install plain `torch`.
+Choose `requirements-gpu.txt` in a separate environment for the CUDA 12.1 runtime. Install `requirements-assistant.txt` to enable semantic retrieval, Re-ID and the optional Anthropic client. `requirements-dev.txt` installs the CPU test stack without Streamlit, FAISS, Anthropic, detector weights or video assets. `requirements.txt` keeps the original full GPU installation available.
+
+Use `python scripts/download_assets.py --group all` for the additional field clips. Each file is checked against [the size and SHA-256 manifest](configs/assets.lock.json). Use `--verify-only` to check a populated cache offline. Follow the [asset terms](THIRD_PARTY_NOTICES.md) before use or redistribution.
 
 ---
 
@@ -286,10 +299,14 @@ pytest                            # all 76 tests should pass
 ### Safety Command Center (the main experience)
 
 ```bash
-streamlit run src/visionguard/dashboard/app.py
+python -m streamlit run src/visionguard/dashboard/app.py
 ```
 
 Pick a video in the sidebar → **Run analysis** → explore KPIs, annotated playback, alerts with evidence photos, the risk-score timeline, the danger heatmap, one-click PDF export, and the Assistant chat tab.
+
+### Reproduce the synthetic walkthrough
+
+Install `requirements-core.txt` and the editable package. Run `python scripts/synthetic_demo.py` to generate the replay, an isolated event database, annotated video and a sample PDF under `outputs/synthetic-demo/`. Pass `--output-dir` for a new destination. The run needs no network, real footage or detector weights.
 
 ### Analyze a video from the CLI
 
@@ -329,8 +346,12 @@ Prints the identity-matching table and saves montage proof sheets to `outputs/re
 ### Run the benchmarks on your machine
 
 ```bash
-python scripts/benchmark.py
+python scripts/benchmark.py --frames 100 --warmup 10 --repetitions 3
 ```
+
+Each run writes a machine-readable manifest, per-frame latency CSV and percentile chart to `outputs/benchmarks/`. The manifest records input and output checksums, sampled frames, timing scope, Python and backend versions, device details, Git commit and whether the working tree had changes. Use `--cpu-only` or `--pytorch-only` to restrict the run. Review files before sharing evidence involving private assets.
+
+The manual GitHub workflow is intended for a trusted self-hosted runner labelled `gpu`. It runs the pinned public sample and can attest the exported measurements. See [field evaluation protocol](docs/FIELD_VALIDATION.md) for validating workplace detection and end-to-end timing separately.
 
 ### Retrain the temporal behavior model
 
@@ -340,11 +361,7 @@ python scripts/train_temporal.py    # ~30 s; prints per-class held-out accuracy
 
 ### Enable full AI assistant answers (optional)
 
-```bash
-set ANTHROPIC_API_KEY=sk-ant-...    # Windows (setx to persist)
-```
-
-Without a key, the assistant answers in a deterministic retrieval-only mode — the feature never breaks.
+The assistant answers locally by default. To allow optional cloud synthesis, first review [the outbound data and privacy settings](PRIVACY.md), install `requirements-assistant.txt`, set `assistant.cloud_enabled: true` and set `ANTHROPIC_API_KEY` in the process environment. In the Assistant tab, check the consent box for the run before submitting a question. Cloud failures fall back to a local answer.
 
 ---
 
@@ -363,7 +380,8 @@ Everything tunable lives in [`configs/config.yaml`](configs/config.yaml) — no 
 | `proximity` | Calibration file, warning/critical distances (meters), cooldowns |
 | `risk_score` | Rolling window, per-event-type weights |
 | `reid` | Embedding model, similarity threshold (site-dependent — see field notes) |
-| `assistant` | Claude model, embedding model, retrieval top-k |
+| `assistant` | Cloud opt-in, Claude model, local embedding model and retrieval top-k |
+| `events` | Local event database and optional screenshots for new runs |
 
 The loader parses YAML into **frozen typed dataclasses** — a typo or missing key fails loudly at startup, not silently mid-video.
 
@@ -371,10 +389,12 @@ The loader parses YAML into **frozen typed dataclasses** — a typo or missing k
 
 ## ✅ Testing & Verification
 
-### Unit tests — 76, GPU-free, ~12 s
+### CPU tests and generated-video smoke test
 
 ```bash
-pytest -v
+python -m pip install -r requirements-dev.txt
+python -m pip install --no-deps -e .
+python -m pytest -q
 ```
 
 | Area | What's covered |
@@ -388,13 +408,14 @@ pytest -v
 | Re-ID gallery | Cross-camera identity sharing, sticky bindings, threshold boundaries, centroid learning |
 | Temporal model | Feature invariances (translation/scale), synthetic-data sanity, save/load, *does-it-actually-learn* check |
 | Storage & reports | Round-trips, ordering, isolation, PDF generation, missing-evidence resilience |
-| Assistant | Fact extraction, no-key fallback, retrieval-failure resilience |
+| Assistant | Fact extraction, retrieval-failure resilience, and default-off cloud behavior even when a key is present |
+| Generated video | Deterministic model fixtures feed real tracking, PPE rules, SQLite, annotated output and PDF creation without external files. Install `requirements-dashboard.txt` to verify the same run in Streamlit. |
 
 ### Live-footage verification suite
 
-Every alarm feature is additionally verified on real videos (all auto-downloaded by `scripts/download_assets.py`):
+These four clips were used in development. Their observed results illustrate individual scenarios. The project has no labeled field dataset or independent accuracy study for these examples. The field clips can be acquired via `scripts/download_assets.py --group all`.
 
-| Test video | What it proves | Result |
+| Test video | Scenario exercised | Historical observation |
 |---|---|---|
 | `construction_steelwork.mp4` | No false alarms on a *compliant* crew; proximity vs. crane machinery | 100% compliance, 0 false PPE alerts, 2 near-misses flagged |
 | `test_person_down.mp4` | **The full alarm chain in one clip** | Zone intrusion → no-vest → no-helmet → **FALL (critical)**; compliance 0%; risk peaks 70/100 |
@@ -410,7 +431,7 @@ Honest findings from building and verifying on real footage — the kind of deta
 - **The verification suite caught a real bug.** A worker hovering at a zone boundary fired 7 intrusion alerts in 4 seconds (one per flicker re-entry). Fixed with a config-driven re-entry cooldown + a regression test. Alarm fatigue is the #1 killer of real safety systems.
 - **Model docs lied about label spelling.** The PPE model's documentation lists `Machinery`/`Vehicle`; the shipped weights embed `machinery`/`vehicle`. Vehicle detection was silently dead until a log line (`ignored: [...]`) exposed it — the class map now covers both spellings, verified against the loaded model.
 - **Uniformed crews are the canonical Re-ID hard case.** Identical vests + helmets compress everyone into a tight embedding cluster (measured: different-person similarity reaches 0.93). The matching threshold is site-dependent config, tuned here from a measured similarity distribution.
-- **INT8 isn't automatically faster.** 4× smaller, yes — but slower on desktop x86 (no fast kernels for dynamically-quantized convs). The win is on ARM edge hardware.
+- **INT8 performance depends on the execution provider.** The historical desktop run recorded a smaller file and higher latency. ARM timing remains unmeasured here.
 - **Zones and calibration are per-camera config.** A zone or homography drawn on one camera view is meaningless on another — which is exactly why the interactive `define_zones.py` / `calibrate_camera.py` tools exist.
 - **cu126 PyTorch + a 537-series NVIDIA driver = `CUDA error: device busy`.** Enumeration succeeds, allocation fails. The cu121 build matches the driver natively; pinned + documented in `requirements.txt`.
 
@@ -430,7 +451,7 @@ Honest findings from building and verifying on real footage — the kind of deta
 - **SQLite** — zero-config event store (schema designed for a later PostgreSQL swap)
 - **ReportLab** — PDF incident report generation
 - **ONNX / ONNX Runtime** — model export, INT8 dynamic quantization, edge benchmarking
-- **pytest** — 76-test suite; **Playwright** — dashboard screenshot automation
+- **pytest** — component and synthetic pipeline checks; **Streamlit AppTest** — dashboard smoke test
 - **Typed frozen-dataclass config, rotating-file logging, pinned requirements** — engineering hygiene throughout
 
 ---
@@ -444,4 +465,4 @@ Honest findings from building and verifying on real footage — the kind of deta
 | Steelwork video | [Pexels — manas patra](https://www.pexels.com/video/workers-on-construction-11798561/) | Pexels License |
 | Test videos (person down / digging / forklift) | Pexels — Ron Lach, K., kelly | Pexels License |
 
-Built as a portfolio project demonstrating end-to-end computer-vision engineering: perception → tracking → spatial & temporal reasoning → risk analytics → product surfaces (dashboard, reports, assistant) → edge deployment, with tests and measured results at every layer. 🦺
+For upstream terms and source attribution, see [third-party notices](THIRD_PARTY_NOTICES.md) and [contributing](CONTRIBUTING.md).

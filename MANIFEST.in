@@ -1,0 +1,3 @@
+include CONTRIBUTING.md PRIVACY.md SECURITY.md THIRD_PARTY_NOTICES.md requirements*.txt
+recursive-include configs *.json *.yaml
+recursive-include scripts *.py

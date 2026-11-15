@@ -132,6 +132,7 @@ class AssistantSettings:
     max_tokens: int
     embedding_model: str
     top_k: int
+    cloud_enabled: bool = False
 
 
 @dataclass(frozen=True)
@@ -140,6 +141,7 @@ class EventSettings:
 
     database_path: Path
     screenshots_dir: Path
+    save_screenshots: bool = True
 
 
 @dataclass(frozen=True)
@@ -200,6 +202,13 @@ def resolve_output_path(value: str | None) -> Path | None:
         return None
     path = Path(value)
     return path if path.is_absolute() else PROJECT_ROOT / path
+
+
+def _bool_setting(section: dict, key: str, default: bool) -> bool:
+    value = section.get(key, default)
+    if type(value) is not bool:
+        raise ValueError(f"{key} must be an unquoted YAML boolean")
+    return value
 
 
 def load_config(config_path: Path | str = DEFAULT_CONFIG_PATH) -> AppConfig:
@@ -300,10 +309,12 @@ def load_config(config_path: Path | str = DEFAULT_CONFIG_PATH) -> AppConfig:
             max_tokens=int(raw["assistant"]["max_tokens"]),
             embedding_model=raw["assistant"]["embedding_model"],
             top_k=int(raw["assistant"]["top_k"]),
+            cloud_enabled=_bool_setting(raw["assistant"], "cloud_enabled", False),
         ),
         events=EventSettings(
             database_path=_resolve(raw["events"]["database_path"]),
             screenshots_dir=_resolve(raw["events"]["screenshots_dir"]),
+            save_screenshots=_bool_setting(raw["events"], "save_screenshots", True),
         ),
         output=OutputSettings(
             annotated_dir=_resolve(raw["output"]["annotated_dir"]),

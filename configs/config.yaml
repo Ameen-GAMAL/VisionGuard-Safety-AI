@@ -82,8 +82,8 @@ reid:
   crops_per_track: 5           # appearance samples averaged per track
 
 assistant:
-  # LLM used to synthesize answers (needs ANTHROPIC_API_KEY in the environment).
-  # Without a key the assistant still works in retrieval-only mode.
+  # Cloud synthesis also requires ANTHROPIC_API_KEY and explicit UI/caller opt-in.
+  cloud_enabled: false
   model: "claude-opus-4-8"
   max_tokens: 1024
   embedding_model: "sentence-transformers/all-MiniLM-L6-v2"
@@ -92,6 +92,7 @@ assistant:
 events:
   database_path: "outputs/events.db"
   screenshots_dir: "outputs/screenshots"
+  save_screenshots: true     # disable when evidence screenshots are not authorized
 
 output:
   annotated_dir: "outputs/annotated"
