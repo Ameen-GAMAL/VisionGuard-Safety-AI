@@ -1,2 +1,7 @@
 # Normalize line endings: store as LF in git, check out per-platform.
 * text=auto
+
+# Benchmark manifests record SHA-256 over exact file bytes.
+benchmarks/**/latency.csv -text whitespace=cr-at-eol
+configs/config.yaml -text whitespace=cr-at-eol
+scripts/benchmark.py text eol=lf
